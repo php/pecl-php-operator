@@ -114,10 +114,12 @@ static inline int _php_operator_decode(zend_uchar opcode, zend_op *opline)
 #define PHP_OPERATOR_OPHANDLER_COUNT				((25 * 151) + 1)
 #define PHP_OPERATOR_REPLACE_OPCODE(opname)			{ int i; for(i = 5; i < 25; i++) if (php_operator_opcode_handlers[(opname*25) + i]) php_operator_opcode_handlers[(opname*25) + i] = php_operator_op_##opname; }
 #define PHP_OPERATOR_DECODE(opcode,opline)			_php_operator_decode(opcode,opline)
+#define PHP_OPERATOR_GET_OPLINE						zend_op *opline = (EG(current_execute_data)->opline);
 #else
 #define PHP_OPERATOR_OPHANDLER_COUNT				512
 #define PHP_OPERATOR_REPLACE_OPCODE(opname)			zend_opcode_handlers[opname] = php_operator_op_##opname
 #define PHP_OPERATOR_DECODE(opcode,opline)			(opcode)
+#define PHP_OPERATOR_GET_OPLINE							
 #endif
 
 static opcode_handler_t *php_operator_original_opcode_handlers;
@@ -130,7 +132,7 @@ static opcode_handler_t php_operator_opcode_handlers[PHP_OPERATOR_OPHANDLER_COUN
 #define PHP_OPERATOR_BINARY_OP(opname,methodname)		\
 static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) \
 { \
-	zend_op *opline = EG(current_execute_data)->opline; \
+	PHP_OPERATOR_GET_OPLINE \
 	zend_free_op free_op1, free_op2; \
 	zval *op1 = php_operator_zval_ptr(&(opline->op1), &free_op1 TSRMLS_CC); \
 	zval *op2 = php_operator_zval_ptr(&(opline->op2), &free_op2 TSRMLS_CC); \
@@ -156,7 +158,7 @@ static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) \
 #define PHP_OPERATOR_UNARY_OP(opname,methodname)		\
 static int php_operator_op_##opname	(ZEND_OPCODE_HANDLER_ARGS) \
 { \
-	zend_op *opline = EG(current_execute_data)->opline; \
+	PHP_OPERATOR_GET_OPLINE \
 	zend_free_op free_op1; \
 	zval *op1 = php_operator_zval_ptr(&(opline->op1), &free_op1 TSRMLS_CC); \
 \
@@ -200,8 +202,13 @@ PHP_OPERATOR_UNARY_OP(ZEND_BOOL_NOT,	"__bool_not")
 PHP_MINIT_FUNCTION(operator)
 {
 	memcpy(php_operator_opcode_handlers, zend_opcode_handlers, sizeof(php_operator_opcode_handlers));
+
+#if PHP_MAJOR_VERSION > 5 || PHP_MINOR_VERSION > 0
 	php_operator_original_opcode_handlers = zend_opcode_handlers;
 	zend_opcode_handlers = php_operator_opcode_handlers;
+#else
+	php_operator_original_opcode_handlers = php_operator_opcode_handlers;
+#endif
 
 	/* Binaries */
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ADD);
@@ -227,7 +234,11 @@ PHP_MINIT_FUNCTION(operator)
 
 PHP_MSHUTDOWN_FUNCTION(operator)
 {
+#if PHP_MAJOR_VERSION > 5 || PHP_MINOR_VERSION > 0
 	zend_opcode_handlers = php_operator_original_opcode_handlers;
+#else
+	memcpy(zend_opcode_handlers, php_operator_original_opcode_handlers, sizeof(php_operator_opcode_handlers));
+#endif
 
 	return SUCCESS;
 }

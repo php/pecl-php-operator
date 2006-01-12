@@ -22,6 +22,13 @@
 #define PHP_OPERATOR_EXTNAME	"operator"
 #define PHP_OPERATOR_EXTVER		"0.1"
 
+#if PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 0
+typedef struct {
+	zval *var;
+} zend_free_op;
+#endif
+
+
 extern zend_module_entry operator_module_entry;
 #define phpext_operator_ptr &operator_module_entry
 
