@@ -56,10 +56,10 @@ static int php_operator_method(zval *result, zval *op1, const char *method, int 
 	return ret;
 }
 
-#define PHP_OPERATOR_EX_T(offset)	(*(temp_variable *)((char*)EG(current_execute_data)->Ts + offset))
+#define PHP_OPERATOR_EX_T(offset)	(*(temp_variable *)((char*)execute_data->Ts + offset))
 #define PHP_OPERATOR_RESULT			&PHP_OPERATOR_EX_T(opline->result.u.var).tmp_var
 
-static zval *php_operator_zval_ptr(znode *node, zend_free_op *should_free TSRMLS_DC)
+static zval *php_operator_zval_ptr(znode *node, zend_free_op *should_free, zend_execute_data *execute_data TSRMLS_DC)
 {
 	should_free->var = NULL;
 
@@ -73,7 +73,7 @@ static zval *php_operator_zval_ptr(znode *node, zend_free_op *should_free TSRMLS
 #if PHP_MAJOR_VERSION > 5 || PHP_MINOR_VERSION > 0
 		case IS_CV:
 		{
-			zval ***ret = &EG(current_execute_data)->CVs[node->u.var];
+			zval ***ret = &execute_data->CVs[node->u.var];
 
 			if (!*ret) {
 				zend_compiled_variable *cv = &EG(active_op_array)->vars[node->u.var];
@@ -114,7 +114,7 @@ static inline int _php_operator_decode(zend_uchar opcode, zend_op *opline)
 #define PHP_OPERATOR_OPHANDLER_COUNT				((25 * 151) + 1)
 #define PHP_OPERATOR_REPLACE_OPCODE(opname)			{ int i; for(i = 5; i < 25; i++) if (php_operator_opcode_handlers[(opname*25) + i]) php_operator_opcode_handlers[(opname*25) + i] = php_operator_op_##opname; }
 #define PHP_OPERATOR_DECODE(opcode,opline)			_php_operator_decode(opcode,opline)
-#define PHP_OPERATOR_GET_OPLINE						zend_op *opline = (EG(current_execute_data)->opline);
+#define PHP_OPERATOR_GET_OPLINE						zend_op *opline = (execute_data->opline);
 #else
 #define PHP_OPERATOR_OPHANDLER_COUNT				512
 #define PHP_OPERATOR_REPLACE_OPCODE(opname)			zend_opcode_handlers[opname] = php_operator_op_##opname
@@ -134,8 +134,8 @@ static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) \
 { \
 	PHP_OPERATOR_GET_OPLINE \
 	zend_free_op free_op1, free_op2; \
-	zval *op1 = php_operator_zval_ptr(&(opline->op1), &free_op1 TSRMLS_CC); \
-	zval *op2 = php_operator_zval_ptr(&(opline->op2), &free_op2 TSRMLS_CC); \
+	zval *op1 = php_operator_zval_ptr(&(opline->op1), &free_op1, execute_data TSRMLS_CC); \
+	zval *op2 = php_operator_zval_ptr(&(opline->op2), &free_op2, execute_data TSRMLS_CC); \
 \
 	if (opline->op1.op_type == IS_CONST || \
 		op1->type != IS_OBJECT || \
@@ -151,7 +151,7 @@ static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) \
 \
 	if (free_op1.var) zval_dtor(free_op1.var); \
 	if (free_op2.var) zval_dtor(free_op2.var); \
-	EG(current_execute_data)->opline++; \
+	execute_data->opline++; \
 	return 0; \
 }
 
@@ -160,7 +160,7 @@ static int php_operator_op_##opname	(ZEND_OPCODE_HANDLER_ARGS) \
 { \
 	PHP_OPERATOR_GET_OPLINE \
 	zend_free_op free_op1; \
-	zval *op1 = php_operator_zval_ptr(&(opline->op1), &free_op1 TSRMLS_CC); \
+	zval *op1 = php_operator_zval_ptr(&(opline->op1), &free_op1, execute_data TSRMLS_CC); \
 \
 	if (opline->op1.op_type == IS_CONST || \
 		op1->type != IS_OBJECT || \
@@ -175,7 +175,7 @@ static int php_operator_op_##opname	(ZEND_OPCODE_HANDLER_ARGS) \
 	} \
 \
 	if (free_op1.var) zval_dtor(free_op1.var); \
-	EG(current_execute_data)->opline++; \
+	execute_data->opline++; \
 	return 0; \
 }
 
