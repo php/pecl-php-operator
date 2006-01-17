@@ -38,6 +38,8 @@
    * Helpers *
    *********** */
 
+#define PHP_OPERATOR_EX_T(offset)	(*(temp_variable *)((char*)execute_data->Ts + offset))
+
 static int php_operator_method(zval *result, zval *op1, const char *method, int method_len, zval *op2 TSRMLS_DC)
 {
 	zval *caller;
@@ -55,9 +57,6 @@ static int php_operator_method(zval *result, zval *op1, const char *method, int 
 
 	return ret;
 }
-
-#define PHP_OPERATOR_EX_T(offset)	(*(temp_variable *)((char*)execute_data->Ts + offset))
-#define PHP_OPERATOR_RESULT			&PHP_OPERATOR_EX_T(opline->result.u.var).tmp_var
 
 static zval *php_operator_zval_ptr(znode *node, zend_free_op *should_free, zend_execute_data *execute_data TSRMLS_DC)
 {
@@ -88,6 +87,61 @@ static zval *php_operator_zval_ptr(znode *node, zend_free_op *should_free, zend_
 		case IS_UNUSED:
 		default:
 			return NULL;
+	}
+}
+
+static zval **php_operator_zval_ptr_ptr(znode *node, zend_execute_data *execute_data TSRMLS_DC)
+{
+	switch (node->op_type) {
+		case IS_VAR:
+			return PHP_OPERATOR_EX_T(node->u.var).var.ptr_ptr;
+#if PHP_MAJOR_VERSION > 5 || PHP_MINOR_VERSION > 0
+		case IS_CV:
+		{
+			zval ***ret = &execute_data->CVs[node->u.var];
+
+			if (!*ret) {
+				zend_compiled_variable *cv = &EG(active_op_array)->vars[node->u.var];
+				if (zend_hash_quick_find(EG(active_symbol_table), cv->name, cv->name_len+1, cv->hash_value, (void **)ret)==FAILURE) {
+					zend_error(E_NOTICE, "Undefined variable: %s", cv->name);
+					return &EG(uninitialized_zval_ptr);
+				}
+			}
+			return *ret;
+		}
+#endif
+		case IS_CONST:
+		case IS_TMP_VAR:
+		case IS_UNUSED:
+		default:
+			return NULL;
+	}	
+}
+
+static inline zval *php_operator_get_result_ptr(zend_op *opline, zend_execute_data *execute_data)
+{
+	zval *tmp;
+
+	if (opline->result.op_type == IS_TMP_VAR) {
+			return &PHP_OPERATOR_EX_T(opline->result.u.var).tmp_var;
+	}
+
+	ALLOC_INIT_ZVAL(tmp);
+	return tmp;
+}
+
+static inline void php_operator_set_result_ptr(zval *result, zend_op *opline, zend_execute_data *execute_data)
+{
+	switch (opline->result.op_type) {
+		case IS_TMP_VAR:
+			/* Nothing to do */
+			return;
+		case IS_VAR:
+			PHP_OPERATOR_EX_T(opline->result.u.var).var.ptr = result;
+			PHP_OPERATOR_EX_T(opline->result.u.var).var.ptr_ptr = &PHP_OPERATOR_EX_T(opline->result.u.var).var.ptr;
+			return;
+		default:
+			zval_ptr_dtor(&result);
 	}
 }
 
@@ -134,6 +188,7 @@ static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) \
 { \
 	PHP_OPERATOR_GET_OPLINE \
 	zend_free_op free_op1, free_op2; \
+	zval *result; \
 	zval *op1 = php_operator_zval_ptr(&(opline->op1), &free_op1, execute_data TSRMLS_CC); \
 	zval *op2 = php_operator_zval_ptr(&(opline->op2), &free_op2, execute_data TSRMLS_CC); \
 \
@@ -144,11 +199,14 @@ static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) \
 		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opname,opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU); \
 	} \
 \
-	if (php_operator_method(PHP_OPERATOR_RESULT, op1, methodname, sizeof(methodname) - 1, op2 TSRMLS_CC) == FAILURE) { \
+	result = php_operator_get_result_ptr(opline, execute_data); \
+	if (php_operator_method(result, op1, methodname, sizeof(methodname) - 1, op2 TSRMLS_CC) == FAILURE) { \
 		/* Fallback on original handler */ \
+		if (opline->result.op_type != IS_TMP_VAR) zval_ptr_dtor(&result); \
 		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opname,opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU); \
 	} \
 \
+	php_operator_set_result_ptr(result, opline, execute_data); \
 	if (free_op1.var) zval_dtor(free_op1.var); \
 	if (free_op2.var) zval_dtor(free_op2.var); \
 	execute_data->opline++; \
@@ -160,6 +218,7 @@ static int php_operator_op_##opname	(ZEND_OPCODE_HANDLER_ARGS) \
 { \
 	PHP_OPERATOR_GET_OPLINE \
 	zend_free_op free_op1; \
+	zval *result; \
 	zval *op1 = php_operator_zval_ptr(&(opline->op1), &free_op1, execute_data TSRMLS_CC); \
 \
 	if (opline->op1.op_type == IS_CONST || \
@@ -169,12 +228,40 @@ static int php_operator_op_##opname	(ZEND_OPCODE_HANDLER_ARGS) \
 		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opname,opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU); \
 	} \
 \
-	if (php_operator_method(PHP_OPERATOR_RESULT, op1, methodname, sizeof(methodname) - 1, NULL TSRMLS_CC) == FAILURE) { \
+	result = php_operator_get_result_ptr(opline, execute_data); \
+	if (php_operator_method(result, op1, methodname, sizeof(methodname) - 1, NULL TSRMLS_CC) == FAILURE) { \
 		/* Fallback on original handler */ \
+		if (opline->result.op_type != IS_TMP_VAR) zval_ptr_dtor(&result); \
 		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opname,opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU); \
 	} \
 \
+	php_operator_set_result_ptr(result, opline, execute_data); \
 	if (free_op1.var) zval_dtor(free_op1.var); \
+	execute_data->opline++; \
+	return 0; \
+}
+
+#define PHP_OPERATOR_UNARY_ASSIGN_OP(opname,methodname)	\
+static int php_operator_op_##opname	(ZEND_OPCODE_HANDLER_ARGS) \
+{ \
+	PHP_OPERATOR_GET_OPLINE \
+	zval *result; \
+	zval **op1 = php_operator_zval_ptr_ptr(&(opline->op1), execute_data TSRMLS_CC); \
+\
+	if (!op1 || Z_TYPE_PP(op1) != IS_OBJECT || \
+		!zend_hash_exists(&Z_OBJCE_PP(op1)->function_table, methodname, sizeof(methodname))) { \
+		/* Rely on primary handler */ \
+		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opname,opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU); \
+	} \
+\
+	result = php_operator_get_result_ptr(opline, execute_data); \
+	if (php_operator_method(result, *op1, methodname, sizeof(methodname) - 1, NULL TSRMLS_CC) == FAILURE) { \
+		/* Fallback on original handler */ \
+		if (opline->result.op_type != IS_TMP_VAR) zval_ptr_dtor(&result); \
+		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opname,opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU); \
+	} \
+\
+	php_operator_set_result_ptr(result, opline, execute_data); \
 	execute_data->opline++; \
 	return 0; \
 }
@@ -194,6 +281,11 @@ PHP_OPERATOR_BINARY_OP(ZEND_BW_XOR,		"__bw_xor")
 PHP_OPERATOR_UNARY_OP(ZEND_BW_NOT,		"__bw_not")
 PHP_OPERATOR_UNARY_OP(ZEND_BOOL,		"__bool")
 PHP_OPERATOR_UNARY_OP(ZEND_BOOL_NOT,	"__bool_not")
+
+PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_PRE_INC,		"__pre_inc")
+PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_PRE_DEC,		"__pre_dec")
+PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_POST_INC,		"__post_inc")
+PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_POST_DEC,		"__post_dec")
 
 /* ***********************
    * Module Housekeeping *
@@ -228,6 +320,12 @@ PHP_MINIT_FUNCTION(operator)
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_BOOL);
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_BOOL_NOT);
 
+	/* Unary Assign */
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_PRE_INC);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_PRE_DEC);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_POST_INC);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_POST_DEC);
+
 	return SUCCESS;
 }
 
@@ -246,9 +344,8 @@ PHP_MSHUTDOWN_FUNCTION(operator)
 PHP_MINFO_FUNCTION(operator)
 {
 	php_info_print_table_start();
-	php_info_print_table_header(2, "operator overloading support", "+ - * / % << >> . | & ^ ~ !");
+	php_info_print_table_header(2, "operator overloading support", "+ - * / % << >> . | & ^ ~ ! ++ --");
 	php_info_print_table_end();
-
 }
 
 zend_module_entry operator_module_entry = {
