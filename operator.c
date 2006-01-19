@@ -241,6 +241,81 @@ static inline int _php_operator_unary_op(ZEND_OPCODE_HANDLER_ARGS, const char *m
 	return 0;
 }
 
+#define PHP_OPERATOR_BINARY_ASSIGN_OP(opname,methodname) static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_binary_assign_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
+static int _php_operator_binary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const char *methodname, int methodname_len)
+{
+	PHP_OPERATOR_GET_OPLINE
+	zend_free_op free_value, free_prop, free_obj;
+	zval *var = NULL, *value, *result;
+	zend_bool increment_opline = 0;
+
+	free_prop.var = free_obj.var = NULL;
+	switch (opline->extended_value) {
+		case ZEND_ASSIGN_OBJ:
+		case ZEND_ASSIGN_DIM:
+		{
+			zend_op *opdata = opline + 1;
+			zval *object = php_operator_zval_ptr(&(opline->op1), &free_obj, execute_data TSRMLS_CC);
+			zval *prop = php_operator_zval_ptr(&(opline->op2), &free_prop, execute_data TSRMLS_CC);
+
+			if (!object || Z_TYPE_P(object) != IS_OBJECT) {
+				/* Let orignal handler throw error */
+				return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+			}
+
+			increment_opline = 1;
+			value = php_operator_zval_ptr(&(opdata->op1), &free_value, execute_data TSRMLS_CC);
+			if (!value) {
+				/* Shouldn't happen */
+				return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+			}
+
+			/* Plan A */
+			if (opline->extended_value == ZEND_ASSIGN_OBJ &&
+				Z_OBJ_HT_P(object)->get_property_ptr_ptr) {
+				zval **varpp = Z_OBJ_HT_P(object)->get_property_ptr_ptr(object, prop TSRMLS_CC);
+				if (varpp) {
+					var = *varpp;
+					break;
+				}
+			}
+
+			/* Plan B */
+			if (opline->extended_value == ZEND_ASSIGN_OBJ &&
+				Z_OBJ_HT_P(object)->read_property) {
+				var = Z_OBJ_HT_P(object)->read_property(object, prop, BP_VAR_RW TSRMLS_CC);
+			} else if (opline->extended_value == ZEND_ASSIGN_DIM &&
+				Z_OBJ_HT_P(object)->read_dimension) {
+				var = Z_OBJ_HT_P(object)->read_dimension(object, prop, BP_VAR_RW TSRMLS_CC);
+			}
+
+			break;
+		}
+		default:
+			var = php_operator_zval_ptr(&(opline->op1), &free_obj, execute_data TSRMLS_CC);
+			value = php_operator_zval_ptr(&(opline->op2), &free_value, execute_data TSRMLS_CC);
+	}
+
+	if (!var || Z_TYPE_P(var) != IS_OBJECT ||
+		!zend_hash_exists(&Z_OBJCE_P(var)->function_table, (char*)methodname, methodname_len + 1)) {
+		/* Rely on primary handler */
+		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+	}
+
+	result = php_operator_get_result_ptr(opline, execute_data);
+	if (php_operator_method(result, var, methodname, methodname_len, value TSRMLS_CC) == FAILURE) {
+		/* Fallback on original handler */
+		if (opline->result.op_type != IS_TMP_VAR) zval_ptr_dtor(&result);
+		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+	}
+
+	if (free_prop.var) zval_dtor(free_prop.var);
+	if (free_value.var) zval_dtor(free_value.var);
+	php_operator_set_result_ptr(result, opline, execute_data);
+	execute_data->opline += increment_opline ? 2 : 1;
+	return 0;
+}
+
 #define PHP_OPERATOR_UNARY_ASSIGN_OP(opname,methodname)	static int php_operator_op_##opname	(ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_unary_assign_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
 static inline int _php_operator_unary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const char *methodname, int methodname_len)
 {
@@ -266,26 +341,38 @@ static inline int _php_operator_unary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const 
 	return 0;
 }
 
-PHP_OPERATOR_BINARY_OP(ZEND_ADD,		"__add")
-PHP_OPERATOR_BINARY_OP(ZEND_SUB,		"__sub")
-PHP_OPERATOR_BINARY_OP(ZEND_MUL,		"__mul")
-PHP_OPERATOR_BINARY_OP(ZEND_DIV,		"__div")
-PHP_OPERATOR_BINARY_OP(ZEND_MOD,		"__mod")
-PHP_OPERATOR_BINARY_OP(ZEND_SL,			"__sl")
-PHP_OPERATOR_BINARY_OP(ZEND_SR,			"__sr")
-PHP_OPERATOR_BINARY_OP(ZEND_CONCAT,		"__concat")
-PHP_OPERATOR_BINARY_OP(ZEND_BW_OR,		"__bw_or")
-PHP_OPERATOR_BINARY_OP(ZEND_BW_AND,		"__bw_and")
-PHP_OPERATOR_BINARY_OP(ZEND_BW_XOR,		"__bw_xor")
+PHP_OPERATOR_BINARY_OP(ZEND_ADD,					"__add")
+PHP_OPERATOR_BINARY_OP(ZEND_SUB,					"__sub")
+PHP_OPERATOR_BINARY_OP(ZEND_MUL,					"__mul")
+PHP_OPERATOR_BINARY_OP(ZEND_DIV,					"__div")
+PHP_OPERATOR_BINARY_OP(ZEND_MOD,					"__mod")
+PHP_OPERATOR_BINARY_OP(ZEND_SL,						"__sl")
+PHP_OPERATOR_BINARY_OP(ZEND_SR,						"__sr")
+PHP_OPERATOR_BINARY_OP(ZEND_CONCAT,					"__concat")
+PHP_OPERATOR_BINARY_OP(ZEND_BW_OR,					"__bw_or")
+PHP_OPERATOR_BINARY_OP(ZEND_BW_AND,					"__bw_and")
+PHP_OPERATOR_BINARY_OP(ZEND_BW_XOR,					"__bw_xor")
 
-PHP_OPERATOR_UNARY_OP(ZEND_BW_NOT,		"__bw_not")
-PHP_OPERATOR_UNARY_OP(ZEND_BOOL,		"__bool")
-PHP_OPERATOR_UNARY_OP(ZEND_BOOL_NOT,	"__bool_not")
+PHP_OPERATOR_UNARY_OP(ZEND_BW_NOT,					"__bw_not")
+PHP_OPERATOR_UNARY_OP(ZEND_BOOL,					"__bool")
+PHP_OPERATOR_UNARY_OP(ZEND_BOOL_NOT,				"__bool_not")
 
-PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_PRE_INC,		"__pre_inc")
-PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_PRE_DEC,		"__pre_dec")
-PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_POST_INC,		"__post_inc")
-PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_POST_DEC,		"__post_dec")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_ADD,		"__assign_add")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_SUB,		"__assign_sub")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_MUL,		"__assign_mul")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_DIV,		"__assign_div")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_MOD,		"__assign_mod")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_SL,		"__assign_sl")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_SR,		"__assign_sr")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_CONCAT,	"__assign_concat")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_BW_OR,	"__assign_bw_or")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_BW_AND,	"__assign_bw_and")
+PHP_OPERATOR_BINARY_ASSIGN_OP(ZEND_ASSIGN_BW_XOR,	"__assign_bw_xor")
+
+PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_PRE_INC,			"__pre_inc")
+PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_PRE_DEC,			"__pre_dec")
+PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_POST_INC,			"__post_inc")
+PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_POST_DEC,			"__post_dec")
 
 /* ***********************
    * Module Housekeeping *
@@ -320,6 +407,19 @@ PHP_MINIT_FUNCTION(operator)
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_BOOL);
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_BOOL_NOT);
 
+	/* Binary Assign */
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_ADD);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_SUB);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_MUL);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_DIV);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_MOD);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_SL);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_SR);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_CONCAT);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_BW_OR);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_BW_AND);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_ASSIGN_BW_XOR);
+
 	/* Unary Assign */
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_PRE_INC);
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_PRE_DEC);
@@ -344,7 +444,8 @@ PHP_MSHUTDOWN_FUNCTION(operator)
 PHP_MINFO_FUNCTION(operator)
 {
 	php_info_print_table_start();
-	php_info_print_table_header(2, "operator overloading support", "+ - * / % << >> . | & ^ ~ ! ++ --");
+	php_info_print_table_header(2, "operator overloading support", "+ - * / % << >> . | & ^ ~ ! ++ -- "
+									"+= -= *= /= %= <<= >>= .= |= &= ^= ~=");
 	php_info_print_table_end();
 }
 
