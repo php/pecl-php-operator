@@ -341,6 +341,51 @@ static inline int _php_operator_unary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const 
 	return 0;
 }
 
+#define PHP_OPERATOR_UNARY_ASSIGN_OBJ_OP(opname,methodname) static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_unary_assign_obj_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
+static inline int _php_operator_unary_assign_obj_op(ZEND_OPCODE_HANDLER_ARGS, const char *methodname, int methodname_len)
+{
+	PHP_OPERATOR_GET_OPLINE
+	zend_free_op free_obj, free_prop;
+	zval *result;
+	zval *obj = php_operator_zval_ptr(&(opline->op1), &free_obj, execute_data TSRMLS_CC);
+	zval *prop = php_operator_zval_ptr(&(opline->op2), &free_prop, execute_data TSRMLS_CC);
+	zval *var = NULL;
+
+	if (!obj || Z_TYPE_P(obj) != IS_OBJECT || !prop) {
+		/* Rely on primary handler */
+		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+	}
+
+	if (Z_OBJ_HT_P(obj)->get_property_ptr_ptr) {
+		zval **varpp = Z_OBJ_HT_P(obj)->get_property_ptr_ptr(obj, prop TSRMLS_CC);
+		if (varpp) {
+			var = *varpp;
+		}
+	}
+	if (!var && Z_OBJ_HT_P(obj)->read_property) {
+		var = Z_OBJ_HT_P(obj)->read_property(obj, prop, BP_VAR_RW TSRMLS_CC);
+	}
+
+	if (!var || Z_TYPE_P(var) != IS_OBJECT ||
+		!zend_hash_exists(&Z_OBJCE_P(var)->function_table, (char*)methodname, methodname_len + 1)) {
+		/* Rely on primary handler */
+		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+	}
+
+	result = php_operator_get_result_ptr(opline, execute_data);
+	if (php_operator_method(result, var, methodname, methodname_len, NULL TSRMLS_CC) == FAILURE) {
+		/* Fallback on original handler */
+		if (opline->result.op_type != IS_TMP_VAR) zval_ptr_dtor(&result);
+		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
+	}
+
+	if (free_obj.var) { zval_dtor(free_obj.var); }
+	if (free_prop.var) { zval_dtor(free_prop.var); }
+	php_operator_set_result_ptr(result, opline, execute_data);
+	execute_data->opline++;
+	return 0;
+}
+
 PHP_OPERATOR_BINARY_OP(ZEND_ADD,					"__add")
 PHP_OPERATOR_BINARY_OP(ZEND_SUB,					"__sub")
 PHP_OPERATOR_BINARY_OP(ZEND_MUL,					"__mul")
@@ -373,6 +418,11 @@ PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_PRE_INC,			"__pre_inc")
 PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_PRE_DEC,			"__pre_dec")
 PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_POST_INC,			"__post_inc")
 PHP_OPERATOR_UNARY_ASSIGN_OP(ZEND_POST_DEC,			"__post_dec")
+
+PHP_OPERATOR_UNARY_ASSIGN_OBJ_OP(ZEND_PRE_INC_OBJ,	"__pre_inc")
+PHP_OPERATOR_UNARY_ASSIGN_OBJ_OP(ZEND_PRE_DEC_OBJ,	"__pre_dec")
+PHP_OPERATOR_UNARY_ASSIGN_OBJ_OP(ZEND_POST_INC_OBJ,	"__post_inc")
+PHP_OPERATOR_UNARY_ASSIGN_OBJ_OP(ZEND_POST_DEC_OBJ,	"__post_dec")
 
 /* ***********************
    * Module Housekeeping *
@@ -425,6 +475,12 @@ PHP_MINIT_FUNCTION(operator)
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_PRE_DEC);
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_POST_INC);
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_POST_DEC);
+
+	/* Unary Assign Obj */
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_PRE_INC_OBJ);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_PRE_DEC_OBJ);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_POST_INC_OBJ);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_POST_DEC_OBJ);
 
 	return SUCCESS;
 }
