@@ -2,7 +2,7 @@
   <name>operator</name>
   <summary>Operator overloading for Objects</summary>
   <description>
-   Operator overloading for +, -, *, /, %, &lt;&lt;, &gt;&gt;, ., |, &amp;, ^, ~, and ! operators.
+   Operator overloading for +, -, *, /, %, &lt;&lt;, &gt;&gt;, ., |, &amp;, ^, ~, !, ++, -- += -= *= /= %= &lt;&lt;= &gt;&gt;= .= |= &= ^= and ~= operators.
   </description>
   <license>PHP</license>
   <maintainers>
@@ -14,12 +14,24 @@
     </maintainer>
   </maintainers>
 
-  <release>
-   <version>0.1</version>
-   <state>beta</state>
-   <date>2006-01-12</date>
-   <notes>Initial Release</notes>
-  </release>
+   <release>
+    <version>0.2</version>
+    <state>beta</state>
+    <date>2006-01-18</date>
+    <notes>* Added support for pre/post inc/dec operators
+* Added support for assignment operators
+* Refactored opline->result handling
+* Refactored opcode handlers</notes>
+   </release>
+
+  <changelog>
+   <release>
+    <version>0.1</version>
+    <state>beta</state>
+    <date>2006-01-12</date>
+    <notes>Initial Release</notes>
+   </release>
+  </changelog>
 
   <filelist>
    <file role="doc" name="CREDITS"/>
@@ -31,6 +43,9 @@
    <dir role="test" name="tests">
     <file role="test" name="unary.phpt"/>
     <file role="test" name="binary.phpt"/>
+    <file role="test" name="incdec.phpt"/>
+    <file role="test" name="binary_assign.phpt"/>
+    <file role="test" name="binary_assign_objdim.phpt"/>
    </dir>
   </filelist>
 
