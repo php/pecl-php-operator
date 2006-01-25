@@ -2,7 +2,7 @@
   <name>operator</name>
   <summary>Operator overloading for Objects</summary>
   <description>
-   Operator overloading for +, -, *, /, %, &lt;&lt;, &gt;&gt;, ., |, &amp;, ^, ~, !, ++, -- += -= *= /= %= &lt;&lt;= &gt;&gt;= .= |= &= ^= and ~= operators.
+   Operator overloading for +, -, *, /, %, &lt;&lt;, &gt;&gt;, ., |, &amp;, ^, ~, !, ++, -- += -= *= /= %= &lt;&lt;= &gt;&gt;= .= |= &amp;= ^= and ~= operators.
   </description>
   <license>PHP</license>
   <maintainers>
