@@ -17,7 +17,7 @@
    <release>
     <version>0.2</version>
     <state>beta</state>
-    <date>2006-01-18</date>
+    <date>2006-01-25</date>
     <notes>* Added support for pre/post inc/dec operators
 * Added support for assignment operators
 * Refactored opline->result handling
