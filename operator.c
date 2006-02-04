@@ -167,11 +167,13 @@ static inline int _php_operator_decode(zend_op *opline)
 }
 #define PHP_OPERATOR_OPHANDLER_COUNT				((25 * 151) + 1)
 #define PHP_OPERATOR_REPLACE_OPCODE(opname)			{ int i; for(i = 5; i < 25; i++) if (php_operator_opcode_handlers[(opname*25) + i]) php_operator_opcode_handlers[(opname*25) + i] = php_operator_op_##opname; }
+#define PHP_OPERATOR_REPLACE_ALL_OPCODE(opname)		{ int i; for(i = 0; i < 25; i++) if (php_operator_opcode_handlers[(opname*25) + i]) php_operator_opcode_handlers[(opname*25) + i] = php_operator_op_##opname; }
 #define PHP_OPERATOR_DECODE(opline)					_php_operator_decode(opline)
 #define PHP_OPERATOR_GET_OPLINE						zend_op *opline = (execute_data->opline);
 #else
 #define PHP_OPERATOR_OPHANDLER_COUNT				512
 #define PHP_OPERATOR_REPLACE_OPCODE(opname)			zend_opcode_handlers[opname] = php_operator_op_##opname
+#define PHP_OPERATOR_REPLACE_ALL_OPCODE(opname)		zend_opcode_handlers[opname] = php_operator_op_##opname
 #define PHP_OPERATOR_DECODE(opline)					(opline->code)
 #define PHP_OPERATOR_GET_OPLINE							
 #endif
@@ -192,8 +194,23 @@ static inline int _php_operator_binary_op(ZEND_OPCODE_HANDLER_ARGS, const char *
 	zval *op1 = php_operator_zval_ptr(&(opline->op1), &free_op1, execute_data TSRMLS_CC);
 	zval *op2 = php_operator_zval_ptr(&(opline->op2), &free_op2, execute_data TSRMLS_CC);
 
-	if (opline->op1.op_type == IS_CONST ||
-		op1->type != IS_OBJECT ||
+#ifdef ZEND_HAVE_DO_BINARY_COMPARE_OP
+	if (opline->extended_value &&
+		opline->opcode == ZEND_IS_SMALLER) {
+		zval *swap = op1; op1 = op2; op2 = swap;
+
+		methodname = "__is_greater";
+		methodname_len = sizeof("__is_greater") - 1;
+	} else if (opline->extended_value &&
+		opline->opcode == ZEND_IS_SMALLER_OR_EQUAL) {
+		zval *swap = op1; op1 = op2; op2 = swap;
+
+		methodname = "__is_greater_or_equal";
+		methodname_len = sizeof("__is_greater_or_equal") - 1;
+	}
+#endif
+
+	if (op1->type != IS_OBJECT ||
 		!zend_hash_exists(&Z_OBJCE_P(op1)->function_table, (char*)methodname, methodname_len + 1)) {
 		/* Rely on primary handler */
 		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
@@ -398,6 +415,14 @@ PHP_OPERATOR_BINARY_OP(ZEND_BW_OR,					"__bw_or")
 PHP_OPERATOR_BINARY_OP(ZEND_BW_AND,					"__bw_and")
 PHP_OPERATOR_BINARY_OP(ZEND_BW_XOR,					"__bw_xor")
 
+PHP_OPERATOR_BINARY_OP(ZEND_IS_IDENTICAL,			"__is_identical")
+PHP_OPERATOR_BINARY_OP(ZEND_IS_NOT_IDENTICAL,		"__is_not_identical")
+PHP_OPERATOR_BINARY_OP(ZEND_IS_EQUAL,				"__is_equal")
+PHP_OPERATOR_BINARY_OP(ZEND_IS_NOT_EQUAL,			"__is_not_equal")
+
+PHP_OPERATOR_BINARY_OP(ZEND_IS_SMALLER,				"__is_smaller") /* includes __is_greater when patch applied */
+PHP_OPERATOR_BINARY_OP(ZEND_IS_SMALLER_OR_EQUAL,	"__is_smaller_or_equal") /* includes __is_greater_or_equal ... */
+
 PHP_OPERATOR_UNARY_OP(ZEND_BW_NOT,					"__bw_not")
 PHP_OPERATOR_UNARY_OP(ZEND_BOOL,					"__bool")
 PHP_OPERATOR_UNARY_OP(ZEND_BOOL_NOT,				"__bool_not")
@@ -452,6 +477,23 @@ PHP_MINIT_FUNCTION(operator)
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_BW_AND);
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_BW_XOR);
 
+	/* Comparators (Binaries in disguise) */
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_IS_IDENTICAL);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_IS_NOT_IDENTICAL);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_IS_EQUAL);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_IS_NOT_EQUAL);
+
+#ifdef ZEND_HAVE_DO_BINARY_COMPARE_OP
+/* __is_greater and __is_greater_or_equal support requires patching parser: compare-greater-VERSION.diff */
+	REGISTER_LONG_CONSTANT("OPERATOR_COMPARE_PATCH",	1,		CONST_CS | CONST_PERSISTENT);
+	PHP_OPERATOR_REPLACE_ALL_OPCODE(ZEND_IS_SMALLER);
+	PHP_OPERATOR_REPLACE_ALL_OPCODE(ZEND_IS_SMALLER_OR_EQUAL);
+#else
+	REGISTER_LONG_CONSTANT("OPERATOR_COMPARE_PATCH",	0,		CONST_CS | CONST_PERSISTENT);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_IS_SMALLER);
+	PHP_OPERATOR_REPLACE_OPCODE(ZEND_IS_SMALLER_OR_EQUAL);
+#endif
+
 	/* Unaries */
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_BW_NOT);
 	PHP_OPERATOR_REPLACE_OPCODE(ZEND_BOOL);
@@ -501,7 +543,11 @@ PHP_MINFO_FUNCTION(operator)
 {
 	php_info_print_table_start();
 	php_info_print_table_header(2, "operator overloading support", "+ - * / % << >> . | & ^ ~ ! ++ -- "
-									"+= -= *= /= %= <<= >>= .= |= &= ^= ~=");
+									"+= -= *= /= %= <<= >>= .= |= &= ^= ~= === !== == != < <= "
+#ifdef ZEND_HAVE_DO_BINARY_COMPARE_OP
+									"> >= "
+#endif
+									);
 	php_info_print_table_end();
 }
 
