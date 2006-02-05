@@ -210,7 +210,7 @@ static inline int _php_operator_binary_op(ZEND_OPCODE_HANDLER_ARGS, const char *
 	}
 #endif
 
-	if (op1->type != IS_OBJECT ||
+	if (!op1 || op1->type != IS_OBJECT ||
 		!zend_hash_exists(&Z_OBJCE_P(op1)->function_table, (char*)methodname, methodname_len + 1)) {
 		/* Rely on primary handler */
 		return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
@@ -238,7 +238,7 @@ static inline int _php_operator_unary_op(ZEND_OPCODE_HANDLER_ARGS, const char *m
 	zval *result;
 	zval *op1 = php_operator_zval_ptr(&(opline->op1), &free_op1, execute_data TSRMLS_CC);
 
-	if (opline->op1.op_type == IS_CONST ||
+	if (!op1 ||
 		op1->type != IS_OBJECT ||
 		!zend_hash_exists(&Z_OBJCE_P(op1)->function_table, (char*)methodname, methodname_len + 1)) {
 		/* Rely on primary handler */
