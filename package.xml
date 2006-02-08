@@ -1,8 +1,10 @@
 <package version="1.0">
   <name>operator</name>
   <summary>Operator overloading for Objects</summary>
-  <description>
-   Operator overloading for +, -, *, /, %, &lt;&lt;, &gt;&gt;, ., |, &amp;, ^, ~, !, ++, -- += -= *= /= %= &lt;&lt;= &gt;&gt;= .= |= &amp;= ^= and ~= operators.
+  <description>Operator overloading for: +, -, *, /, %, &lt;&lt;, &gt;&gt;, ., |, &amp;, ^, ~, !, ++, --,
++=, -=, *=, /=, %=, &lt;&lt;=, &gt;&gt;=, .=, |=, &amp;=, ^=, ~=,
+==, !=, ===, !==, &lt;, and &lt;= operators.
+Conditional support for &gt; and &gt;= available with application of a patch.
   </description>
   <license>PHP</license>
   <maintainers>
@@ -15,6 +17,18 @@
   </maintainers>
 
    <release>
+    <version>0.3</version>
+    <state>beta</state>
+    <date>2006-02-03</date>
+    <notes>* Added support for comparator ops
+
+Note: ZE treats &gt; style comparisons as backwards &lt; comparisons, so what looks like a left-associative greater than becomes a right-associative less-than.
+Because of this, overloading the &gt; and &gt;= operators for left-association requires application of a parser patch.
+</notes>
+   </release>
+
+  <changelog>
+   <release>
     <version>0.2</version>
     <state>beta</state>
     <date>2006-01-25</date>
@@ -24,7 +38,6 @@
 * Refactored opcode handlers</notes>
    </release>
 
-  <changelog>
    <release>
     <version>0.1</version>
     <state>beta</state>
@@ -40,12 +53,16 @@
    <file role="src" name="config.w32"/>
    <file role="src" name="operator.c"/>
    <file role="src" name="php_operator.h"/>
+   <file role="src" name="compare-greater-5.0.5.diff"/>
+   <file role="src" name="compare-greater-5.1.2.diff"/>
    <dir role="test" name="tests">
     <file role="test" name="unary.phpt"/>
     <file role="test" name="binary.phpt"/>
     <file role="test" name="incdec.phpt"/>
     <file role="test" name="binary_assign.phpt"/>
     <file role="test" name="binary_assign_objdim.phpt"/>
+    <file role="test" name="compare.phpt"/>
+    <file role="test" name="compare2.phpt"/>
    </dir>
   </filelist>
 

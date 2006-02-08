@@ -20,7 +20,7 @@
 #define PHP_OPERATOR_H
 
 #define PHP_OPERATOR_EXTNAME	"operator"
-#define PHP_OPERATOR_EXTVER		"0.2"
+#define PHP_OPERATOR_EXTVER		"0.3"
 
 #if PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 0
 typedef struct {
