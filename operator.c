@@ -174,7 +174,7 @@ static inline int _php_operator_decode(zend_op *opline)
 #define PHP_OPERATOR_OPHANDLER_COUNT				512
 #define PHP_OPERATOR_REPLACE_OPCODE(opname)			zend_opcode_handlers[opname] = php_operator_op_##opname
 #define PHP_OPERATOR_REPLACE_ALL_OPCODE(opname)		zend_opcode_handlers[opname] = php_operator_op_##opname
-#define PHP_OPERATOR_DECODE(opline)					(opline->code)
+#define PHP_OPERATOR_DECODE(opline)					(opline->opcode)
 #define PHP_OPERATOR_GET_OPLINE							
 #endif
 
