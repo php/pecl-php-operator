@@ -546,6 +546,7 @@ PHP_MINFO_FUNCTION(operator)
 									"> >= "
 #endif
 									);
+	php_info_print_table_row(2, "version", PHP_OPERATOR_VERSION);
 	php_info_print_table_end();
 }
 
@@ -561,7 +562,7 @@ zend_module_entry operator_module_entry = {
 	NULL, /* RSHUTDOWN */
 	PHP_MINFO(operator),
 #if ZEND_MODULE_API_NO >= 20010901
-	PHP_OPERATOR_EXTVER,
+	PHP_OPERATOR_VERSION,
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
