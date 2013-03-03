@@ -40,6 +40,20 @@
 #define ZEND_ENGINE_2_1
 #endif
 
+#ifdef ZEND_ENGINE_2_4
+# define PHP_OPERATOR_OP_TYPE(zop) (zop##_type)
+# define PHP_OPERATOR_OP_U(zop) (zop)
+# define PHP_OPERATOR_LITERAL_DC , const struct _zend_literal *key
+# define PHP_OPERATOR_LITERAL_CC , key
+# define PHP_OPERATOR_LITERAL_NULL_CC , NULL
+#else
+# define PHP_OPERATOR_OP_TYPE(zop) ((zop).op_type)
+# define PHP_OPERATOR_OP_U(zop) ((zop).u)
+# define PHP_OPERATOR_LITERAL_DC
+# define PHP_OPERATOR_LITERAL_CC
+# define PHP_OPERATOR_LITERAL_NULL_CC
+#endif
+
 #if defined(ZEND_ENGINE_2) && !defined(ZEND_ENGINE_2_1)
 typedef struct {
 	zval *var;
