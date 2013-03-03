@@ -32,7 +32,7 @@
 #define ZEND_VM_KIND_CALL	1
 #endif
 
-#if (PHP_MAJOR_VERSION > 5 || PHP_MINOR_VERSION > 0) && ZEND_VM_KIND != ZEND_VM_KIND_CALL
+#if defined(ZEND_ENGINE_2_1) && ZEND_VM_KIND != ZEND_VM_KIND_CALL
 # error "Operator overload support requires CALL style Zend VM"
 #endif
 
@@ -50,7 +50,7 @@ static inline int php_operator_method(zval *result, zval *op1, const char *metho
 	ALLOC_INIT_ZVAL(caller);
 	array_init(caller);
 
-	ZVAL_ADDREF(op1);
+	Z_ADDREF_P(op1);
 	add_index_zval(caller, 0, op1);
 	add_index_stringl(caller, 1, (char*)method, method_len, 1);
 
@@ -71,7 +71,7 @@ static inline zval *php_operator_zval_ptr(znode *node, zend_free_op *should_free
 			return PHP_OPERATOR_EX_T(node->u.var).var.ptr;
 		case IS_TMP_VAR:
 			return (should_free->var = &PHP_OPERATOR_EX_T(node->u.var).tmp_var);
-#if PHP_MAJOR_VERSION > 5 || PHP_MINOR_VERSION > 0
+#ifdef ZEND_ENGINE_2_1
 		case IS_CV:
 		{
 			zval ***ret = &execute_data->CVs[node->u.var];
@@ -97,7 +97,7 @@ static inline zval **php_operator_zval_ptr_ptr(znode *node, zend_execute_data *e
 	switch (node->op_type) {
 		case IS_VAR:
 			return PHP_OPERATOR_EX_T(node->u.var).var.ptr_ptr;
-#if PHP_MAJOR_VERSION > 5 || PHP_MINOR_VERSION > 0
+#ifdef ZEND_ENGINE_2_1
 		case IS_CV:
 		{
 			zval ***ret = &execute_data->CVs[node->u.var];
@@ -147,7 +147,7 @@ static inline void php_operator_set_result_ptr(zval *result, zend_op *opline, ze
 	}
 }
 
-#if PHP_MAJOR_VERSION > 5 || PHP_MINOR_VERSION > 0
+#ifdef ZEND_ENGINE_2_1
 static inline int _php_operator_decode(zend_op *opline)
 {
 	int ret = opline->opcode * 25;
@@ -167,13 +167,25 @@ static inline int _php_operator_decode(zend_op *opline)
 	}
 	return ret;
 }
-#define PHP_OPERATOR_OPHANDLER_COUNT				((25 * 151) + 1)
+
+#if defined(ZEND_ENGINE_2_5)
+# define PHP_OPERATOR_OPCODE_COUNT		163
+#elif defined(ZEND_ENGINE_2_4)
+# define PHP_OPERATOR_OPCODE_COUNT		158
+#elif defined(ZEND_ENGINE_2_3)
+# define PHP_OPERATOR_OPCODE_COUNT		153
+#else /* PHP 5.1 and 5.2 */
+# define PHP_OPERATOR_OPCODE_COUNT		150
+#endif
+
+#define PHP_OPERATOR_OPHANDLER_COUNT				((25 * (PHP_OPERATOR_OPCODE_COUNT + 1)) + 1)
 #define PHP_OPERATOR_REPLACE_OPCODE(opname)			{ int i; for(i = 5; i < 25; i++) if (php_operator_opcode_handlers[(opname*25) + i]) php_operator_opcode_handlers[(opname*25) + i] = php_operator_op_##opname; }
 #define PHP_OPERATOR_REPLACE_ALL_OPCODE(opname)		{ int i; for(i = 0; i < 25; i++) if (php_operator_opcode_handlers[(opname*25) + i]) php_operator_opcode_handlers[(opname*25) + i] = php_operator_op_##opname; }
 #define PHP_OPERATOR_DECODE(opline)					_php_operator_decode(opline)
 #define PHP_OPERATOR_GET_OPLINE						zend_op *opline = (execute_data->opline);
 #else
-#define PHP_OPERATOR_OPHANDLER_COUNT				512
+#define PHP_OPERATOR_OPCODE_COUNT				512
+#define PHP_OPERATOR_OPHANDLER_COUNT				PHP_OPERATOR_OPCODE_COUNT
 #define PHP_OPERATOR_REPLACE_OPCODE(opname)			zend_opcode_handlers[opname] = php_operator_op_##opname
 #define PHP_OPERATOR_REPLACE_ALL_OPCODE(opname)		zend_opcode_handlers[opname] = php_operator_op_##opname
 #define PHP_OPERATOR_DECODE(opline)					(opline->opcode)
@@ -183,11 +195,19 @@ static inline int _php_operator_decode(zend_op *opline)
 static opcode_handler_t *php_operator_original_opcode_handlers;
 static opcode_handler_t php_operator_opcode_handlers[PHP_OPERATOR_OPHANDLER_COUNT];
 
+#ifndef ZEND_FASTCALL
+#define ZEND_FASTCALL
+#endif
+
+#ifndef Z_ADDREF_P
+# define Z_ADDREF_P(pzv) ((pzv)->refcount++)
+#endif
+
 /* *******************
    * Op Replacements *
    ******************* */
 
-#define PHP_OPERATOR_BINARY_OP(opname,methodname) static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_binary_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
+#define PHP_OPERATOR_BINARY_OP(opname,methodname) static int ZEND_FASTCALL php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_binary_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
 static inline int _php_operator_binary_op(ZEND_OPCODE_HANDLER_ARGS, const char *methodname, int methodname_len)
 {
 	PHP_OPERATOR_GET_OPLINE
@@ -232,7 +252,7 @@ static inline int _php_operator_binary_op(ZEND_OPCODE_HANDLER_ARGS, const char *
 	return 0;
 }
 
-#define PHP_OPERATOR_UNARY_OP(opname,methodname) static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_unary_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
+#define PHP_OPERATOR_UNARY_OP(opname,methodname) static int ZEND_FASTCALL php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_unary_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
 static inline int _php_operator_unary_op(ZEND_OPCODE_HANDLER_ARGS, const char *methodname, int methodname_len)
 {
 	PHP_OPERATOR_GET_OPLINE
@@ -260,7 +280,7 @@ static inline int _php_operator_unary_op(ZEND_OPCODE_HANDLER_ARGS, const char *m
 	return 0;
 }
 
-#define PHP_OPERATOR_BINARY_ASSIGN_OP(opname,methodname) static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_binary_assign_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
+#define PHP_OPERATOR_BINARY_ASSIGN_OP(opname,methodname) static int ZEND_FASTCALL php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_binary_assign_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
 static int _php_operator_binary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const char *methodname, int methodname_len)
 {
 	PHP_OPERATOR_GET_OPLINE
@@ -335,7 +355,7 @@ static int _php_operator_binary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const char *
 	return 0;
 }
 
-#define PHP_OPERATOR_UNARY_ASSIGN_OP(opname,methodname)	static int php_operator_op_##opname	(ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_unary_assign_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
+#define PHP_OPERATOR_UNARY_ASSIGN_OP(opname,methodname)	static int ZEND_FASTCALL php_operator_op_##opname	(ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_unary_assign_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
 static inline int _php_operator_unary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const char *methodname, int methodname_len)
 {
 	PHP_OPERATOR_GET_OPLINE
@@ -360,7 +380,7 @@ static inline int _php_operator_unary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const 
 	return 0;
 }
 
-#define PHP_OPERATOR_UNARY_ASSIGN_OBJ_OP(opname,methodname) static int php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_unary_assign_obj_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
+#define PHP_OPERATOR_UNARY_ASSIGN_OBJ_OP(opname,methodname) static int ZEND_FASTCALL php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_unary_assign_obj_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
 static inline int _php_operator_unary_assign_obj_op(ZEND_OPCODE_HANDLER_ARGS, const char *methodname, int methodname_len)
 {
 	PHP_OPERATOR_GET_OPLINE

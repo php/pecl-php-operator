@@ -24,7 +24,23 @@
 #define PHP_OPERATOR_EXTNAME	"operator"
 #define PHP_OPERATOR_VERSION	"0.4.0-dev"
 
-#if PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 0
+#if ZEND_MODULE_API_NO > 20121211
+#define ZEND_ENGINE_2_5
+#endif
+#if ZEND_MODULE_API_NO > 20100524
+#define ZEND_ENGINE_2_4
+#endif
+#if ZEND_MODULE_API_NO > 20090625
+#define ZEND_ENGINE_2_3
+#endif
+#if ZEND_MODULE_API_NO > 20050922
+#define ZEND_ENGINE_2_2
+#endif
+#if ZEND_MODULE_API_NO > 20050921
+#define ZEND_ENGINE_2_1
+#endif
+
+#if defined(ZEND_ENGINE_2) && !defined(ZEND_ENGINE_2_1)
 typedef struct {
 	zval *var;
 } zend_free_op;
