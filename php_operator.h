@@ -60,6 +60,9 @@ typedef struct {
 } zend_free_op;
 #endif
 
+#ifndef EX_CV_NUM
+# define EX_CV_NUM(ex, n) (&((ex)->CVs[(n)]))
+#endif
 
 extern zend_module_entry operator_module_entry;
 #define phpext_operator_ptr &operator_module_entry

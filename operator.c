@@ -40,7 +40,9 @@
    * Helpers *
    *********** */
 
-#define PHP_OPERATOR_EX_T(offset)	(*(temp_variable *)((char*)execute_data->Ts + offset))
+#ifndef EX_TMP_VAR
+# define EX_TMP_VAR(ex, ofs)	((temp_variable *)((char*)(ex)->Ts + (ofs)))
+#endif
 
 static inline int php_operator_method(zval *result, zval *op1, const char *method, int method_len, zval *op2 TSRMLS_DC)
 {
@@ -78,13 +80,13 @@ static inline zval *php_operator_zval_ptr(zend_uchar optype, operator_znode_op *
 			return &(node_op->u.constant);
 #endif
 		case IS_VAR:
-			return PHP_OPERATOR_EX_T(PHP_OPERATOR_OP_U(*node_op).var).var.ptr;
+			return EX_TMP_VAR(execute_data, PHP_OPERATOR_OP_U(*node_op).var)->var.ptr;
 		case IS_TMP_VAR:
-			return (should_free->var = &PHP_OPERATOR_EX_T(PHP_OPERATOR_OP_U(*node_op).var).tmp_var);
+			return (should_free->var = &EX_TMP_VAR(execute_data, PHP_OPERATOR_OP_U(*node_op).var)->tmp_var);
 #ifdef ZEND_ENGINE_2_1
 		case IS_CV:
 		{
-			zval ***ret = &execute_data->CVs[PHP_OPERATOR_OP_U(*node_op).var];
+			zval ***ret = EX_CV_NUM(execute_data, PHP_OPERATOR_OP_U(*node_op).var);
 
 			if (!*ret) {
 				zend_compiled_variable *cv = &EG(active_op_array)->vars[PHP_OPERATOR_OP_U(*node_op).var];
@@ -106,11 +108,11 @@ static inline zval **php_operator_zval_ptr_ptr(zend_uchar optype, operator_znode
 {
 	switch (optype) {
 		case IS_VAR:
-			return PHP_OPERATOR_EX_T(PHP_OPERATOR_OP_U(*node_op).var).var.ptr_ptr;
+			return EX_TMP_VAR(execute_data, PHP_OPERATOR_OP_U(*node_op).var)->var.ptr_ptr;
 #ifdef ZEND_ENGINE_2_1
 		case IS_CV:
 		{
-			zval ***ret = &execute_data->CVs[PHP_OPERATOR_OP_U(*node_op).var];
+			zval ***ret = EX_CV_NUM(execute_data, PHP_OPERATOR_OP_U(*node_op).var);
 
 			if (!*ret) {
 				zend_compiled_variable *cv = &EG(active_op_array)->vars[PHP_OPERATOR_OP_U(*node_op).var];
@@ -135,7 +137,7 @@ static inline zval *php_operator_get_result_ptr(zend_op *opline, zend_execute_da
 	zval *tmp;
 
 	if (PHP_OPERATOR_OP_TYPE(opline->result) == IS_TMP_VAR) {
-			return &PHP_OPERATOR_EX_T(PHP_OPERATOR_OP_U(opline->result).var).tmp_var;
+			return &EX_TMP_VAR(execute_data, PHP_OPERATOR_OP_U(opline->result).var)->tmp_var;
 	}
 
 	ALLOC_INIT_ZVAL(tmp);
@@ -149,9 +151,9 @@ static inline void php_operator_set_result_ptr(zval *result, zend_op *opline, ze
 			/* Nothing to do */
 			return;
 		case IS_VAR:
-			PHP_OPERATOR_EX_T(PHP_OPERATOR_OP_U(opline->result).var).var.ptr = result;
-			PHP_OPERATOR_EX_T(PHP_OPERATOR_OP_U(opline->result).var).var.ptr_ptr =
-                                         &PHP_OPERATOR_EX_T(PHP_OPERATOR_OP_U(opline->result).var).var.ptr;
+			EX_TMP_VAR(execute_data, PHP_OPERATOR_OP_U(opline->result).var)->var.ptr = result;
+			EX_TMP_VAR(execute_data, PHP_OPERATOR_OP_U(opline->result).var)->var.ptr_ptr =
+                                         &EX_TMP_VAR(execute_data, PHP_OPERATOR_OP_U(opline->result).var)->var.ptr;
 			return;
 		default:
 			zval_ptr_dtor(&result);
@@ -291,6 +293,12 @@ static inline int _php_operator_unary_op(ZEND_OPCODE_HANDLER_ARGS, const char *m
 	return 0;
 }
 
+#ifdef ZEND_ENGINE_2_5
+# define BP_VAR_RW_55_CC , BP_VAR_RW
+#else
+# define BP_VAR_RW_55_CC
+#endif
+
 #define PHP_OPERATOR_BINARY_ASSIGN_OP(opname,methodname) static int ZEND_FASTCALL php_operator_op_##opname (ZEND_OPCODE_HANDLER_ARGS) { return _php_operator_binary_assign_op(ZEND_OPCODE_HANDLER_ARGS_PASSTHRU, methodname, sizeof(methodname) - 1); }
 static int _php_operator_binary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const char *methodname, int methodname_len)
 {
@@ -323,7 +331,7 @@ static int _php_operator_binary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const char *
 			/* Plan A */
 			if (opline->extended_value == ZEND_ASSIGN_OBJ &&
 				Z_OBJ_HT_P(object)->get_property_ptr_ptr) {
-				zval **varpp = Z_OBJ_HT_P(object)->get_property_ptr_ptr(object, prop PHP_OPERATOR_LITERAL_NULL_CC TSRMLS_CC);
+				zval **varpp = Z_OBJ_HT_P(object)->get_property_ptr_ptr(object, prop BP_VAR_RW_55_CC PHP_OPERATOR_LITERAL_NULL_CC TSRMLS_CC);
 				if (varpp) {
 					var = *varpp;
 					break;
@@ -407,7 +415,7 @@ static inline int _php_operator_unary_assign_obj_op(ZEND_OPCODE_HANDLER_ARGS, co
 	}
 
 	if (Z_OBJ_HT_P(obj)->get_property_ptr_ptr) {
-		zval **varpp = Z_OBJ_HT_P(obj)->get_property_ptr_ptr(obj, prop PHP_OPERATOR_LITERAL_NULL_CC TSRMLS_CC);
+		zval **varpp = Z_OBJ_HT_P(obj)->get_property_ptr_ptr(obj, prop BP_VAR_RW_55_CC PHP_OPERATOR_LITERAL_NULL_CC TSRMLS_CC);
 		if (varpp) {
 			var = *varpp;
 		}
