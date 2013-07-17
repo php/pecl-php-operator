@@ -316,7 +316,7 @@ static int _php_operator_binary_assign_op(ZEND_OPCODE_HANDLER_ARGS, const char *
 			zval *object = php_operator_zval_ptr(PHP_OPERATOR_OP_TYPE(opline->op1), &(opline->op1), &free_obj, execute_data TSRMLS_CC);
 			zval *prop = php_operator_zval_ptr(PHP_OPERATOR_OP_TYPE(opline->op2), &(opline->op2), &free_prop, execute_data TSRMLS_CC);
 
-			if (!object || Z_TYPE_P(object) != IS_OBJECT) {
+			if (!object || Z_TYPE_P(object) != IS_OBJECT || !prop) {
 				/* Let orignal handler throw error */
 				return php_operator_original_opcode_handlers[PHP_OPERATOR_DECODE(opline)](ZEND_OPCODE_HANDLER_ARGS_PASSTHRU);
 			}
