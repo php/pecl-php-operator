@@ -6,10 +6,9 @@ http://pear.php.net/dtd/package-2.0.xsd">
  <name>operator</name>
  <channel>pecl.php.net</channel>
  <summary>Operator overloading for Objects</summary>
- <description>Operator overloading for: +, -, *, /, %, &lt;&lt;, &gt;&gt;, ., |, &amp;, ^, ~, !, ++, --,
-+=, -=, *=, /=, %=, &lt;&lt;=, &gt;&gt;=, .=, |=, &amp;=, ^=, ~=,
-==, !=, ===, !==, &lt;, and &lt;= operators.
-Conditional support for &gt; and &gt;= available with application of a patch.
+ <description>Operator overloading for: +, -, *, /, %, **, &lt;&lt;, &gt;&gt;, ., |, &amp;, ^, ~, !, ++, --,
++=, -=, *=, /=, %=, **=, &lt;&lt;=, &gt;&gt;=, .=, |=, &amp;=, ^=, ~=,
+==, !=, ===, !==, &lt;, &lt;=, and &lt;=&gt; operators.
   
  </description>
  <lead>
@@ -18,11 +17,11 @@ Conditional support for &gt; and &gt;= available with application of a patch.
   <email>pollita@php.net</email>
   <active>yes</active>
  </lead>
- <date>2009-11-05</date>
- <time>17:54:16</time>
+ <date>2017-03-08</date>
+ <time>20:54:00</time>
  <version>
-  <release>0.3</release>
-  <api>0.3</api>
+  <release>1.0</release>
+  <api>1.0</api>
  </version>
  <stability>
   <release>beta</release>
@@ -30,30 +29,26 @@ Conditional support for &gt; and &gt;= available with application of a patch.
  </stability>
  <license uri="http://www.php.net/license">PHP</license>
  <notes>
-* Added support for comparator ops
-
-Note: ZE treats &gt; style comparisons as backwards &lt; comparisons, so what looks like a left-associative greater than becomes a right-associative less-than.
-Because of this, overloading the &gt; and &gt;= operators for left-association requires application of a parser patch.
+* Rewrote for PHP7, dropped PHP5 support
+* Removed is_greater(_or_equal) support
+* Removed pre/post inc/dec support for objects in object properties (this will come back eventually)
+* Added pow, assign-pow, and spaceship operators
  </notes>
  <contents>
   <dir name="/">
    <dir name="tests">
     <file name="binary.phpt" role="test" />
     <file name="binary_assign.phpt" role="test" />
-    <file name="binary_assign_objdim.phpt" role="test" />
+    <file name="bug56904.phpt" role="test" />
     <file name="compare.phpt" role="test" />
-    <file name="compare2.phpt" role="test" />
     <file name="incdec.phpt" role="test" />
     <file name="unary.phpt" role="test" />
    </dir> <!-- //tests -->
-   <file name="compare-greater-5.0.5.diff" role="src" />
-   <file name="compare-greater-5.1.2.diff" role="src" />
    <file name="config.m4" role="src" />
    <file name="config.w32" role="src" />
    <file name="CREDITS" role="doc" />
    <file name="EXPERIMENTAL" role="doc" />
    <file name="operator.c" role="src" />
-   <file name="php_operator.h" role="src" />
   </dir> <!-- / -->
  </contents>
  <dependencies>
@@ -69,6 +64,26 @@ Because of this, overloading the &gt; and &gt;= operators for left-association r
  <providesextension>operator</providesextension>
  <extsrcrelease />
  <changelog>
+  <release>
+   <date>2009-11-05</date>
+   <time>17:54:16</time>
+   <version>
+    <release>0.3</release>
+    <api>0.3</api>
+   </version>
+   <stability>
+    <release>beta</release>
+    <api>beta</api>
+   </stability>
+   <license uri="http://www.php.net/license">PHP</license>
+   <notes>
+* Added support for comparator ops
+
+Note: ZE treats &gt; style comparisons as backwards &lt; comparisons, so what looks like a left-associative greater than becomes a right-associative less-than.
+Because of this, overloading the &gt; and &gt;= operators for left-association requires application of a parser patch.
+   </notes>
+ <contents>
+  </release>
   <release>
    <version>
     <release>0.2</release>
