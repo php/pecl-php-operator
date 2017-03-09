@@ -43,7 +43,7 @@ The following overload methods are supported:
 | $o == $arg | `__is_equal($arg)` |
 | $o != $arg | `__is_not_equal($arg)` |
 | $o < $arg | `__is_smaller($arg)` |
-| $o <= $arg | `__is_smaller_or_equal)($arg)` |
+| $o <= $arg | `__is_smaller_or_equal($arg)` |
 | $o <=> $arg | `__cmp($arg)` |
 | ++$o | `__pre_inc()` |
 | $o++  | `__post_inc()` |
