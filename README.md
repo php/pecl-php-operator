@@ -34,7 +34,7 @@ The following overload methods are supported:
 | $o << $arg | `__sl($arg)` |
 | $o >> $arg | `__sr($arg)` |
 | $o . $arg | `__concat($arg)` |
-| $o | $arg | `__bw_or($arg)` |
+| $o &#x7c; $arg | `__bw_or($arg)` |
 | $o & $arg | `__bw_and($arg)` |
 | $o ^ $arg | `__bw_xor($arg)` |
 | ~$o | `__bw_not()` |
@@ -59,7 +59,7 @@ The following overload methods are supported:
 | $o <<= $arg | `__assign_sl($arg)` |
 | $o >>= $arg | `__assign_sr($arg)` |
 | $o .= $arg | `__assign_concat($arg)` |
-| $o |= $arg | `__assign_bw_or($arg)` |
+| $o &#x7c;= $arg | `__assign_bw_or($arg)` |
 | $o &= $arg | `__assign_bw_and($arg)` |
 | $o ^= $arg | `__assign_bw_xor($arg)` |
 
