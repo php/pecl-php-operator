@@ -78,8 +78,16 @@ zval *get_zval_ptr_undef(zend_uchar op_type, znode_op op, zend_free_op *free_op,
   UNARY_ASSIGN_OPS(X) \
   BINARY_ASSIGN_OPS(X)
 
+/* greater/greater-equal are encoded as smaller/smaller-equal
+ * so they require special handling
+ */
+#define GREATER_OPS(X) \
+  X(IS_SMALLER,          __is_greater) \
+  X(IS_SMALLER_OR_EQUAL, __is_greater_or_equal)
+
 #define X(op, meth) static zend_string *s_##meth;
 ALL_OPS(X)
+GREATER_OPS(X)
 #undef X
 
 /* {{{ operator_method_name */
@@ -96,13 +104,13 @@ ALL_OPS(X)
 /* }}} */
 
 /* {{{ operator_get_method */
-static zend_bool operator_get_method(zend_uchar opcode, zval *obj,
+static zend_bool operator_get_method(zend_string *method, zval *obj,
                                      zend_fcall_info *fci,
                                      zend_fcall_info_cache *fcc) {
   memset(fci, 0, sizeof(zend_fcall_info));
   fci->size = sizeof(zend_fcall_info);
   fci->object = Z_OBJ_P(obj);
-  ZVAL_STR(&(fci->function_name), operator_method_name(opcode));
+  ZVAL_STR(&(fci->function_name), method);
 
   if (!zend_is_callable_ex(&(fci->function_name), fci->object,
                            IS_CALLABLE_CHECK_SILENT | IS_CALLABLE_STRICT,
@@ -122,13 +130,28 @@ static zend_bool operator_get_method(zend_uchar opcode, zval *obj,
 }
 /* }}} */
 
+/* {{{ operator_is_greater_op */
+static inline zend_bool operator_is_greater_op(const zend_op *opline, zend_string **pmethod) {
+  if (opline->extended_value == 1) {
+    switch (opline->opcode) {
+#define X(op, meth) \
+      case ZEND_##op: *pmethod = s_##meth; return 1;
+GREATER_OPS(X)
+#undef X
+    }
+  }
+  return 0;
+}
+/* }}} */
+
 /* {{{ op_handler */
 static int op_handler(zend_execute_data *execute_data) {
   USE_OPLINE
   zend_free_op free_op1 = NULL, free_op2 = NULL;
-  zval *op1, *op2;
+  zval *op1, *op2 = NULL;
   zend_fcall_info fci;
   zend_fcall_info_cache fcc;
+  zend_string *method = operator_method_name(opline->opcode);
 
   if (opline->op1_type == IS_UNUSED) {
     /* Assign op */
@@ -137,23 +160,32 @@ static int op_handler(zend_execute_data *execute_data) {
     op1 = GET_OP1_ZVAL_PTR_UNDEF(BP_VAR_R);
   }
   ZVAL_DEREF(op1);
-  if ((Z_TYPE_P(op1) != IS_OBJECT) ||
-      !operator_get_method(opline->opcode, op1, &fci, &fcc)) {
-    /* Not an overloaded call */
-    return ZEND_USER_OPCODE_DISPATCH;
-  }
 
-  fci.retval = EX_VAR(opline->result.var);
   switch (opline->opcode) {
 #define X(op, meth) \
     case ZEND_##op:
 BINARY_OPS(X)
 BINARY_ASSIGN_OPS(X)
 #undef X
-      fci.params = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
-      fci.param_count = 1;
+      op2 = GET_OP2_ZVAL_PTR_UNDEF(BP_VAR_R);
   }
 
+  if (operator_is_greater_op(opline, &method)) {
+    zval *tmp = op1;
+    zend_free_op free_tmp = free_op1;
+    op1 = op2; op2 = tmp;
+    free_op1 = free_op2; free_op2 = free_tmp;
+  }
+
+  if ((Z_TYPE_P(op1) != IS_OBJECT) ||
+      !operator_get_method(method, op1, &fci, &fcc)) {
+    /* Not an overloaded call */
+    return ZEND_USER_OPCODE_DISPATCH;
+  }
+
+  fci.retval = EX_VAR(opline->result.var);
+  fci.params = op2;
+  fci.param_count = op2 ? 1 : 0;
   if (FAILURE == zend_call_function(&fci, &fcc)) {
     php_error(E_WARNING, "Failed calling %s::%s()", Z_OBJCE_P(op1)->name, Z_STRVAL(fci.function_name));
     ZVAL_NULL(fci.retval);
@@ -168,6 +200,11 @@ BINARY_ASSIGN_OPS(X)
 
 /* {{{ MINIT */
 static PHP_MINIT_FUNCTION(operator) {
+#define X(op, meth) \
+  s_##meth = zend_string_init(#meth, strlen(#meth), 1);
+GREATER_OPS(X)
+#undef X
+
 #define X(op, meth) \
   s_##meth = zend_string_init(#meth, strlen(#meth), 1); \
   zend_set_user_opcode_handler(ZEND_##op, op_handler);

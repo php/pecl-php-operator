@@ -44,6 +44,8 @@ The following overload methods are supported:
 | $o != $arg | `__is_not_equal($arg)` |
 | $o < $arg | `__is_smaller($arg)` |
 | $o <= $arg | `__is_smaller_or_equal($arg)` |
+| $o > $arg | `__is_greater($arg)` &#42; |
+| $o >= $arg | `__is_greater_or_equal($arg)` &#42; |
 | $o <=> $arg | `__cmp($arg)` |
 | ++$o | `__pre_inc()` |
 | $o++  | `__post_inc()` |
@@ -63,4 +65,4 @@ The following overload methods are supported:
 | $o &= $arg | `__assign_bw_and($arg)` |
 | $o ^= $arg | `__assign_bw_xor($arg)` |
 
-
+&#42; - `__is_greater()` and `__is_greater_or_equal()` require a rebuild of the main PHP runtime using the [included patch](php7-is_greater.diff). Withtout this patch, `$a &gt; $b` is automatically remapped to `$b &lt; $a` by the engine.

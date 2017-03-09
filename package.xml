@@ -30,7 +30,6 @@ http://pear.php.net/dtd/package-2.0.xsd">
  <license uri="http://www.php.net/license">PHP</license>
  <notes>
 * Rewrote for PHP7, dropped PHP5 support
-* Removed is_greater(_or_equal) support
 * Removed pre/post inc/dec support for objects in object properties (this will come back eventually)
 * Added pow, assign-pow, and spaceship operators
  </notes>
