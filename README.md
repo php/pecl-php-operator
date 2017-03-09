@@ -65,4 +65,4 @@ The following overload methods are supported:
 | $o &= $arg | `__assign_bw_and($arg)` |
 | $o ^= $arg | `__assign_bw_xor($arg)` |
 
-&#42; - `__is_greater()` and `__is_greater_or_equal()` require a rebuild of the main PHP runtime using the [included patch](php7-is_greater.diff). Withtout this patch, `$a &gt; $b` is automatically remapped to `$b &lt; $a` by the engine.
+&#42; - `__is_greater()` and `__is_greater_or_equal()` require a rebuild of the main PHP runtime using the [included patch](php7-is_greater.diff). Withtout this patch, `$a > $b` is automatically remapped to `$b < $a` by the engine.
