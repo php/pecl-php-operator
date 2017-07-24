@@ -81,7 +81,6 @@ http://pear.php.net/dtd/package-2.0.xsd">
 Note: ZE treats &gt; style comparisons as backwards &lt; comparisons, so what looks like a left-associative greater than becomes a right-associative less-than.
 Because of this, overloading the &gt; and &gt;= operators for left-association requires application of a parser patch.
    </notes>
- <contents>
   </release>
   <release>
    <version>
