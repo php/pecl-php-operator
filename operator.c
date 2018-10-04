@@ -234,4 +234,3 @@ static zend_module_entry operator_module_entry = {
 #ifdef COMPILE_DL_OPERATOR
 ZEND_GET_MODULE(operator)
 #endif
-

@@ -9,7 +9,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
  <description>Operator overloading for: +, -, *, /, %, **, &lt;&lt;, &gt;&gt;, ., |, &amp;, ^, ~, !, ++, --,
 +=, -=, *=, /=, %=, **=, &lt;&lt;=, &gt;&gt;=, .=, |=, &amp;=, ^=, ~=,
 ==, !=, ===, !==, &lt;, &lt;=, and &lt;=&gt; operators.
-  
+
  </description>
  <lead>
   <name>Sara Golemon</name>

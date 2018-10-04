@@ -7,4 +7,3 @@ if (PHP_OPERATOR != "no") {
 	AC_DEFINE("ZEND_VM_KIND", 1, "CFLAGS_OPERATOR");
 	EXTENSION("operator", "operator.c");
 }
-

@@ -17,7 +17,7 @@ $bob->__assign_sl('abc');
 var_dump($bob);
 $bob <<= 'def';
 var_dump($bob);
-
+?>
 --EXPECTF--
 object(a)#%d (1) {
   ["v"]=>
