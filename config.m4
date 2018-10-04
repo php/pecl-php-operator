@@ -1,4 +1,3 @@
-dnl $Id$
 dnl config.m4 for extension operators
 
 PHP_ARG_ENABLE(operator, whether to enable operator overload support,
