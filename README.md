@@ -1,6 +1,6 @@
 # Operator overloading extension for PHP7
 
-## Usage
+## Usage:
 
 Implement magic methods in a class to provide operator overloading automatically, for example:
 
